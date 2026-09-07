@@ -20,6 +20,7 @@ import android.widget.Toast;
 import com.limelight.LimeLog;
 import com.limelight.R;
 import com.limelight.preferences.PreferenceConfiguration;
+import com.limelight.usbip.UsbIpPreferences;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -137,6 +138,17 @@ public class UsbDriverService extends Service implements UsbDriverListener {
     }
 
     private void handleUsbDeviceState(UsbDevice device) {
+        if (device == null) {
+            return;
+        }
+
+        // A USB device explicitly selected for USB/IP belongs to the USB/IP data
+        // plane. Do not let Moonlight's userspace Xbox driver open/claim it too.
+        if (UsbIpPreferences.isSelected(this, device)) {
+            LimeLog.info("Skipping Moonlight USB driver for USB/IP device: " + device.getDeviceName());
+            return;
+        }
+
         // Are we able to operate it?
         if (shouldClaimDevice(device, prefConfig.bindAllUsb)) {
             // Do we have permission yet?
@@ -205,7 +217,7 @@ public class UsbDriverService extends Service implements UsbDriverListener {
                 return;
             }
 
-            // Add this controller to the list
+            // Add this controller to our list
             controllers.add(controller);
         }
     }
