@@ -7,6 +7,7 @@
     <string name="usbip_server_stopped">Server stopped</string>
     <string name="usbip_refresh_devices">Refresh USB devices</string>
     <string name="usbip_no_devices">No USB devices are attached</string>
+    <string name="usbip_no_shared_devices">Select and authorize at least one USB device before starting the server</string>
     <string name="usbip_device_needs_permission">Tap to grant USB access and share this device</string>
     <string name="usbip_device_shared">Shared over USB/IP</string>
     <string name="usbip_permission_denied">USB permission was not granted</string>
