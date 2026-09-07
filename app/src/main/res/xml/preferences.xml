@@ -205,6 +205,14 @@
             android:summary="@string/summary_checkbox_host_audio"
             android:defaultValue="false" />
     </PreferenceCategory>
+    <PreferenceCategory
+        android:key="category_usbip_settings"
+        android:title="@string/usbip_settings_title">
+        <com.limelight.usbip.UsbIpSettingsPreference
+            android:key="usbip_settings"
+            android:title="@string/usbip_settings_title"
+            android:summary="@string/usbip_settings_summary" />
+    </PreferenceCategory>
     <PreferenceCategory android:title="@string/category_ui_settings"
         android:key="category_ui_settings">
         <CheckBoxPreference
