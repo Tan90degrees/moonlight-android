@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="usbip_settings_title">USB/IP device sharing</string>
+    <string name="usbip_settings_summary">Share selected USB devices with a remote computer</string>
+    <string name="usbip_server_enable">USB/IP server</string>
+    <string name="usbip_server_running">Listening on TCP port %1$d</string>
+    <string name="usbip_server_stopped">Server stopped</string>
+    <string name="usbip_refresh_devices">Refresh USB devices</string>
+    <string name="usbip_no_devices">No USB devices are attached</string>
+    <string name="usbip_device_needs_permission">Tap to grant USB access and share this device</string>
+    <string name="usbip_device_shared">Shared over USB/IP</string>
+    <string name="usbip_permission_denied">USB permission was not granted</string>
+    <string name="usbip_notification_channel">USB/IP sharing</string>
+    <string name="usbip_notification_title">USB/IP server is running</string>
+    <string name="usbip_notification_text">Sharing selected USB devices on TCP port %1$d</string>
+    <string name="usbip_security_note">USB/IP has no authentication or encryption. Use it only on a trusted LAN or through a VPN.</string>
+</resources>
