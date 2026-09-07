@@ -17,7 +17,6 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -43,6 +42,8 @@ public final class UsbIpServer implements AutoCloseable {
     private final AtomicBoolean running = new AtomicBoolean();
     private final ExecutorService clientExecutor = Executors.newCachedThreadPool();
     private final ExecutorService transferExecutor = Executors.newCachedThreadPool();
+    private final Set<Socket> clientSockets = ConcurrentHashMap.newKeySet();
+    private final Set<String> importedBusIds = ConcurrentHashMap.newKeySet();
 
     private volatile ServerSocket serverSocket;
     private volatile Thread acceptThread;
@@ -96,6 +97,7 @@ public final class UsbIpServer implements AutoCloseable {
     }
 
     private void handleClient(Socket socket) {
+        clientSockets.add(socket);
         try (Socket client = socket;
              DataInputStream in = new DataInputStream(new BufferedInputStream(client.getInputStream()));
              DataOutputStream out = new DataOutputStream(new BufferedOutputStream(client.getOutputStream()))) {
@@ -126,7 +128,12 @@ public final class UsbIpServer implements AutoCloseable {
         catch (EOFException ignored) {
         }
         catch (IOException | RuntimeException e) {
-            LimeLog.warning("USB/IP client error: " + e.getMessage());
+            if (running.get()) {
+                LimeLog.warning("USB/IP client error: " + e.getMessage());
+            }
+        }
+        finally {
+            clientSockets.remove(socket);
         }
     }
 
@@ -158,25 +165,36 @@ public final class UsbIpServer implements AutoCloseable {
             return;
         }
 
-        final UsbIpTransferEngine transferEngine;
-        try {
-            transferEngine = new UsbIpTransferEngine(usbManager, selected.device);
-        }
-        catch (RuntimeException e) {
+        if (!importedBusIds.add(selected.busId)) {
             writeOpCommon(out, UsbIpConstants.OP_REP_IMPORT, UsbIpConstants.ST_DEV_BUSY);
             out.flush();
             return;
         }
 
-        writeOpCommon(out, UsbIpConstants.OP_REP_IMPORT, UsbIpConstants.ST_OK);
-        selected.writeDevice(out);
-        out.flush();
+        try {
+            final UsbIpTransferEngine transferEngine;
+            try {
+                transferEngine = new UsbIpTransferEngine(usbManager, selected.device);
+            }
+            catch (RuntimeException e) {
+                writeOpCommon(out, UsbIpConstants.OP_REP_IMPORT, UsbIpConstants.ST_DEV_BUSY);
+                out.flush();
+                return;
+            }
 
-        LimeLog.info("USB/IP imported device " + selected.busId + " (" +
-                String.format("%04x:%04x", selected.device.getVendorId(), selected.device.getProductId()) + ")");
+            writeOpCommon(out, UsbIpConstants.OP_REP_IMPORT, UsbIpConstants.ST_OK);
+            selected.writeDevice(out);
+            out.flush();
 
-        try (UsbIpTransferEngine ignored = transferEngine) {
-            runUrbSession(in, out, transferEngine);
+            LimeLog.info("USB/IP imported device " + selected.busId + " (" +
+                    String.format("%04x:%04x", selected.device.getVendorId(), selected.device.getProductId()) + ")");
+
+            try (UsbIpTransferEngine ignored = transferEngine) {
+                runUrbSession(in, out, transferEngine);
+            }
+        }
+        finally {
+            importedBusIds.remove(selected.busId);
         }
     }
 
@@ -204,7 +222,7 @@ public final class UsbIpServer implements AutoCloseable {
                 int transferBufferLength = in.readInt();
                 int startFrame = in.readInt();
                 int numberOfPackets = in.readInt();
-                int interval = in.readInt();
+                in.readInt(); // interval
                 byte[] setup = new byte[8];
                 in.readFully(setup);
 
@@ -212,12 +230,10 @@ public final class UsbIpServer implements AutoCloseable {
                     throw new IOException("Invalid USB/IP transfer length " + transferBufferLength);
                 }
 
-                // ISO URBs carry packet descriptors after the transfer payload. We don't
-                // claim to support those yet because consuming the stream incorrectly would
-                // desynchronize every later URB on this TCP connection.
+                // ISO URBs carry packet descriptors after the transfer payload. Close the
+                // import session before touching that variable-sized payload so the parser
+                // can never become desynchronized.
                 if (numberOfPackets > 0) {
-                    sendRetSubmit(out, writeLock, seqnum, devid, direction, endpoint,
-                            UsbIpConstants.ERR_ENOSYS, new byte[0], 0, startFrame, numberOfPackets);
                     throw new IOException("Isochronous USB/IP URBs are not supported yet");
                 }
 
@@ -247,14 +263,17 @@ public final class UsbIpServer implements AutoCloseable {
                                 startFrame, 0);
                     }
                     catch (IOException e) {
-                        LimeLog.warning("USB/IP response failed: " + e.getMessage());
+                        if (running.get()) {
+                            LimeLog.warning("USB/IP response failed: " + e.getMessage());
+                        }
                     }
                 });
                 pendingTransfer.future = future;
             }
             else if (command == UsbIpConstants.USBIP_CMD_UNLINK) {
                 int unlinkSeqnum = in.readInt();
-                // CMD_UNLINK has 24 reserved bytes after seqnum.
+                // The type-specific union is 28 bytes on the wire. CMD_UNLINK uses
+                // the first 4 bytes for seqnum and leaves the remaining 24 reserved.
                 byte[] padding = new byte[24];
                 in.readFully(padding);
 
@@ -269,7 +288,7 @@ public final class UsbIpServer implements AutoCloseable {
                     status = UsbIpConstants.ERR_ECONNRESET;
                 }
                 else {
-                    // Linux returns 0 when the target already completed before unlink.
+                    // The target raced to completion before this unlink arrived.
                     status = 0;
                 }
                 sendRetUnlink(out, writeLock, seqnum, devid, direction, endpoint, status);
@@ -320,7 +339,7 @@ public final class UsbIpServer implements AutoCloseable {
             out.writeInt(startFrame);
             out.writeInt(numberOfPackets);
             out.writeInt(0); // error_count
-            out.writeLong(0); // setup[8]
+            out.writeLong(0); // union padding to the 28-byte type-specific header
             if (direction == UsbIpConstants.USBIP_DIR_IN && status == 0 && data != null) {
                 out.write(data, 0, Math.min(actualLength, data.length));
             }
@@ -370,6 +389,19 @@ public final class UsbIpServer implements AutoCloseable {
             catch (IOException ignored) {
             }
         }
+
+        // Closing active client sockets releases imported USB handles promptly and
+        // unblocks threads waiting in DataInputStream.read*().
+        for (Socket client : new ArrayList<>(clientSockets)) {
+            try {
+                client.close();
+            }
+            catch (IOException ignored) {
+            }
+        }
+        clientSockets.clear();
+        importedBusIds.clear();
+
         clientExecutor.shutdownNow();
         transferExecutor.shutdownNow();
         LimeLog.info("USB/IP server stopped");
