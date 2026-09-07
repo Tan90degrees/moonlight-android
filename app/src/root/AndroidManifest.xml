@@ -1,10 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+
     <!-- Root application name -->
     <!-- Ensure native libraries are always extracted for root builds,
          since we must invoke the evdev_reader binary ourselves -->
     <application
         android:label="@string/app_label_root"
-        android:extractNativeLibs="true" />
+        android:extractNativeLibs="true">
+        <activity
+            android:name="com.limelight.usbip.UsbIpSettings"
+            android:exported="false"
+            android:label="@string/usbip_settings_title" />
+        <service
+            android:name="com.limelight.usbip.UsbIpServerService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+    </application>
 </manifest>
