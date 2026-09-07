@@ -104,7 +104,7 @@
             android:defaultValue="100"
             android:max="200"
             android:summary="@string/summary_seekbar_vibrate_fallback_strength"
-            android:text="@string/suffix_seekbar_deadzone"
+            android:text="@string/suffix_seekbar_vibrate_fallback_strength"
             android:title="@string/title_seekbar_vibrate_fallback_strength"/>
         <CheckBoxPreference
             android:key="checkbox_flip_face_buttons"
@@ -157,7 +157,7 @@
             android:dependency="checkbox_show_onscreen_controls"
             android:title="@string/title_checkbox_vibrate_osc"
             android:summary="@string/summary_checkbox_vibrate_osc"
-            android:defaultValue="true" />
+            android:defaultValue="false" />
         <CheckBoxPreference
             android:defaultValue="false"
             android:dependency="checkbox_show_onscreen_controls"
@@ -181,7 +181,7 @@
             android:max="100"
             android:defaultValue="90"
             android:summary="@string/summary_osc_opacity"
-            android:text="@string/suffix_seekbar_osc_opacity"
+            android:text="@string/suffix_osc_opacity"
             android:title="@string/dialog_title_osc_opacity" />
         <com.limelight.preferences.ConfirmDeleteOscPreference
             android:title="@string/title_reset_osc"
