@@ -108,7 +108,7 @@ public final class UsbIpServerService extends Service {
                 ? new Notification.Builder(this, CHANNEL_ID)
                 : new Notification.Builder(this);
         return builder
-                .setSmallIcon(R.drawable.ic_stat_notify)
+                .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle(getString(R.string.usbip_notification_title))
                 .setContentText(getString(R.string.usbip_notification_text, UsbIpPreferences.getPort(this)))
                 .setContentIntent(contentIntent)
