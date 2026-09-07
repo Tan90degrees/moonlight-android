@@ -1,7 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+
     <!-- Non-root application name -->
     <!-- FIXME: We should set extractNativeLibs=false but this breaks installation on the Fire TV 3 -->
-    <application android:label="@string/app_label" />
+    <application android:label="@string/app_label">
+        <activity
+            android:name="com.limelight.usbip.UsbIpSettings"
+            android:exported="false"
+            android:label="@string/usbip_settings_title" />
+        <service
+            android:name="com.limelight.usbip.UsbIpServerService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+    </application>
 </manifest>
