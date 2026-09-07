@@ -1,6 +1,8 @@
 package com.limelight.usbip;
 
+import android.hardware.usb.UsbConfiguration;
 import android.hardware.usb.UsbDevice;
+import android.hardware.usb.UsbEndpoint;
 import android.hardware.usb.UsbInterface;
 
 import java.io.DataOutputStream;
@@ -32,13 +34,19 @@ final class UsbIpDevice {
         out.writeShort(device.getVendorId() & 0xffff);
         out.writeShort(device.getProductId() & 0xffff);
         // Android's public UsbDevice API doesn't expose bcdDevice. 0x0100 is a
-        // safe placeholder and is not used to select the host-side USB driver.
+        // harmless placeholder; host-side driver matching uses VID/PID/class.
         out.writeShort(0x0100);
 
         out.writeByte(device.getDeviceClass() & 0xff);
         out.writeByte(device.getDeviceSubclass() & 0xff);
         out.writeByte(device.getDeviceProtocol() & 0xff);
-        out.writeByte(1); // bConfigurationValue; Android exposes active config indirectly
+
+        int configurationValue = 1;
+        if (device.getConfigurationCount() > 0) {
+            UsbConfiguration configuration = device.getConfiguration(0);
+            configurationValue = configuration.getId();
+        }
+        out.writeByte(configurationValue & 0xff);
         out.writeByte(Math.max(1, device.getConfigurationCount()) & 0xff);
         out.writeByte(device.getInterfaceCount() & 0xff);
     }
@@ -69,11 +77,26 @@ final class UsbIpDevice {
     }
 
     private static int guessSpeed(UsbDevice device) {
-        // There is no public negotiated-speed API on the minSdk used by Moonlight.
-        // High speed is the least surprising default for classic USB 2.x devices;
-        // this value is advisory metadata for vhci_hcd and does not change the
-        // actual transfer path on Android.
-        return UsbIpConstants.USB_SPEED_HIGH;
+        // Android doesn't expose negotiated USB speed through the public API.
+        // Endpoint max-packet size gives us a useful lower bound without root/JNI:
+        // >512 strongly implies SuperSpeed, >64 implies HighSpeed. Devices whose
+        // endpoints fit in 64 bytes are conservatively advertised as FullSpeed.
+        int maxPacketSize = 0;
+        for (int i = 0; i < device.getInterfaceCount(); i++) {
+            UsbInterface intf = device.getInterface(i);
+            for (int e = 0; e < intf.getEndpointCount(); e++) {
+                UsbEndpoint endpoint = intf.getEndpoint(e);
+                maxPacketSize = Math.max(maxPacketSize, endpoint.getMaxPacketSize());
+            }
+        }
+
+        if (maxPacketSize > 512) {
+            return UsbIpConstants.USB_SPEED_SUPER;
+        }
+        if (maxPacketSize > 64) {
+            return UsbIpConstants.USB_SPEED_HIGH;
+        }
+        return UsbIpConstants.USB_SPEED_FULL;
     }
 
     private static void writeFixedString(DataOutputStream out, String value, int size) throws IOException {
