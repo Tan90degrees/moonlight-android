@@ -148,13 +148,32 @@ public final class UsbIpSettings extends Activity {
         }
 
         if (checked) {
+            if (!hasAuthorizedSelectedDevice()) {
+                updatingSwitch = true;
+                serverSwitch.setChecked(false);
+                updatingSwitch = false;
+                UsbIpPreferences.setEnabled(this, false);
+                Toast.makeText(this, R.string.usbip_no_shared_devices, Toast.LENGTH_LONG).show();
+                refreshServerState();
+                return;
+            }
+            UsbIpPreferences.setEnabled(this, true);
             UsbIpServerService.start(this);
         }
         else {
+            UsbIpPreferences.setEnabled(this, false);
             UsbIpServerService.stop(this);
         }
-        UsbIpPreferences.setEnabled(this, checked);
         refreshServerState();
+    }
+
+    private boolean hasAuthorizedSelectedDevice() {
+        for (UsbDevice device : usbManager.getDeviceList().values()) {
+            if (UsbIpPreferences.isSelected(this, device) && usbManager.hasPermission(device)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void refreshServerState() {
@@ -215,6 +234,7 @@ public final class UsbIpSettings extends Activity {
             else {
                 UsbIpPreferences.setSelected(this, selected, false);
             }
+            refreshServerState();
         });
         row.addView(checkBox, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
