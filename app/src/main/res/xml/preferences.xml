@@ -104,7 +104,7 @@
             android:defaultValue="100"
             android:max="200"
             android:summary="@string/summary_seekbar_vibrate_fallback_strength"
-            android:text="@string/suffix_seekbar_vibrate_fallback_strength"
+            android:text="@string/suffix_seekbar_deadzone"
             android:title="@string/title_seekbar_vibrate_fallback_strength"/>
         <CheckBoxPreference
             android:key="checkbox_flip_face_buttons"
@@ -181,7 +181,7 @@
             android:max="100"
             android:defaultValue="90"
             android:summary="@string/summary_osc_opacity"
-            android:text="@string/suffix_osc_opacity"
+            android:text="@string/suffix_seekbar_osc_opacity"
             android:title="@string/dialog_title_osc_opacity" />
         <com.limelight.preferences.ConfirmDeleteOscPreference
             android:title="@string/title_reset_osc"
@@ -204,6 +204,14 @@
             android:title="@string/title_checkbox_host_audio"
             android:summary="@string/summary_checkbox_host_audio"
             android:defaultValue="false" />
+    </PreferenceCategory>
+    <PreferenceCategory
+        android:key="category_usbip_settings"
+        android:title="@string/usbip_settings_title">
+        <com.limelight.usbip.UsbIpSettingsPreference
+            android:key="usbip_settings"
+            android:title="@string/usbip_settings_title"
+            android:summary="@string/usbip_settings_summary" />
     </PreferenceCategory>
     <PreferenceCategory android:title="@string/category_ui_settings"
         android:key="category_ui_settings">
