@@ -24,6 +24,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -247,7 +248,10 @@ public final class UsbIpServer implements AutoCloseable {
                 PendingTransfer pendingTransfer = new PendingTransfer();
                 pending.put(seqnum, pendingTransfer);
 
-                Future<?> future = transferExecutor.submit(() -> {
+                // Publish the Future before the task can start. With ExecutorService.submit(),
+                // CMD_UNLINK could race between scheduling and assigning pendingTransfer.future,
+                // leaving a real Android USB request running after we acknowledged cancellation.
+                FutureTask<Void> future = new FutureTask<>(() -> {
                     UsbIpTransferEngine.Result result = transferEngine.submit(
                             direction, endpoint, transferFlags, transferBufferLength,
                             setup, submittedPayload, IO_TIMEOUT_MS);
@@ -267,8 +271,9 @@ public final class UsbIpServer implements AutoCloseable {
                             LimeLog.warning("USB/IP response failed: " + e.getMessage());
                         }
                     }
-                });
+                }, null);
                 pendingTransfer.future = future;
+                transferExecutor.execute(future);
             }
             else if (command == UsbIpConstants.USBIP_CMD_UNLINK) {
                 int unlinkSeqnum = in.readInt();
@@ -331,9 +336,12 @@ public final class UsbIpServer implements AutoCloseable {
         synchronized (lock) {
             out.writeInt(UsbIpConstants.USBIP_RET_SUBMIT);
             out.writeInt(seqnum);
-            out.writeInt(devid);
-            out.writeInt(direction);
-            out.writeInt(endpoint);
+            // USB/IP response basic-header fields other than seqnum are reserved and
+            // must be zero. Some clients tolerate echoing the request values, but the
+            // Linux protocol explicitly specifies zero here.
+            out.writeInt(0); // devid
+            out.writeInt(0); // direction
+            out.writeInt(0); // endpoint
             out.writeInt(status);
             out.writeInt(actualLength);
             out.writeInt(startFrame);
@@ -353,9 +361,9 @@ public final class UsbIpServer implements AutoCloseable {
         synchronized (lock) {
             out.writeInt(UsbIpConstants.USBIP_RET_UNLINK);
             out.writeInt(seqnum);
-            out.writeInt(devid);
-            out.writeInt(direction);
-            out.writeInt(endpoint);
+            out.writeInt(0); // devid
+            out.writeInt(0); // direction
+            out.writeInt(0); // endpoint
             out.writeInt(status);
             for (int i = 0; i < 6; i++) {
                 out.writeInt(0);
